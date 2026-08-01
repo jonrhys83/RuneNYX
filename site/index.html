@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RuneNYX — Grand Exchange screener</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bitter:ital,wght@0,500;0,700;1,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#141210;
+    --parchment:#e8e0cf;
+    --parchment-dim:#d6cbb3;
+    --rule:#bfb094;
+    --gold:#a8842c;
+    --rise:#3f6b46;
+    --fall:#8f3222;
+    --pin:#7a3d8c;
+    --muted:#6e6558;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--parchment); color:var(--ink);
+    font:400 15px/1.5 "IBM Plex Mono", ui-monospace, monospace;
+  }
+  header{
+    border-bottom:2px solid var(--ink);
+    padding:22px 20px 16px;
+    display:flex; flex-wrap:wrap; gap:14px; align-items:baseline;
+  }
+  h1{
+    font:700 30px/1 "Bitter", Georgia, serif;
+    margin:0; letter-spacing:-.02em;
+  }
+  h1 span{color:var(--gold)}
+  .tag{font-size:12px; color:var(--muted); letter-spacing:.08em; text-transform:uppercase}
+  .stamp{margin-left:auto; font-size:12px; color:var(--muted); text-align:right}
+
+  .controls{
+    display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+    padding:14px 20px; border-bottom:1px solid var(--rule);
+  }
+  input,select{
+    font:inherit; font-size:13px; padding:7px 10px;
+    background:#f3eee1; color:var(--ink);
+    border:1px solid var(--rule); border-radius:0;
+  }
+  input:focus,select:focus,button:focus-visible{outline:2px solid var(--gold); outline-offset:1px}
+  input[type=search]{min-width:220px; flex:1}
+  .chip{
+    font:500 12px/1 "IBM Plex Mono", monospace; letter-spacing:.04em;
+    padding:8px 12px; cursor:pointer;
+    background:transparent; color:var(--muted);
+    border:1px solid var(--rule);
+  }
+  .chip[aria-pressed=true]{background:var(--ink); color:var(--parchment); border-color:var(--ink)}
+
+  .wrap{padding:0 20px 60px}
+  table{width:100%; border-collapse:collapse; font-size:13px}
+  th{
+    text-align:right; font-weight:600; font-size:11px; letter-spacing:.08em;
+    text-transform:uppercase; color:var(--muted);
+    padding:12px 8px; border-bottom:1px solid var(--ink);
+    position:sticky; top:0; background:var(--parchment); cursor:pointer; white-space:nowrap;
+  }
+  th:first-child{text-align:left}
+  th[aria-sort]{color:var(--ink)}
+  th[aria-sort=descending]::after{content:" ↓"}
+  th[aria-sort=ascending]::after{content:" ↑"}
+  td{padding:9px 8px; text-align:right; border-bottom:1px solid var(--parchment-dim); white-space:nowrap}
+  td:first-child{text-align:left; white-space:normal; font-family:"Bitter",Georgia,serif; font-size:14px}
+  tbody tr:hover{background:#f0e9d9}
+  .up{color:var(--rise)} .down{color:var(--fall)}
+  .members::after{content:" ★"; color:var(--gold); font-size:10px}
+  .pinned{
+    display:inline-block; margin-left:6px; padding:1px 5px;
+    font-size:10px; letter-spacing:.06em; color:#fff; background:var(--pin);
+  }
+  .note{padding:40px 20px; color:var(--muted); font-size:14px; max-width:60ch}
+  .note b{color:var(--ink)}
+  code{background:#f3eee1; padding:1px 4px; border:1px solid var(--rule)}
+  @media (max-width:760px){
+    .hide-sm{display:none}
+    h1{font-size:24px}
+  }
+  @media (prefers-reduced-motion:no-preference){
+    tbody tr{transition:background .12s}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Rune<span>NYX</span></h1>
+  <span class="tag">Grand Exchange screener</span>
+  <span class="stamp" id="stamp">loading…</span>
+</header>
+
+<div class="controls">
+  <input type="search" id="q" placeholder="Search item name" autocomplete="off">
+  <button class="chip" id="f-pinned" aria-pressed="false">Pinned at 5% cap</button>
+  <button class="chip" id="f-cheap" aria-pressed="false">Below 30d average</button>
+  <button class="chip" id="f-members" aria-pressed="false">Members only</button>
+  <select id="minvol">
+    <option value="0">Any volume</option>
+    <option value="100">100+ /day</option>
+    <option value="1000" selected>1,000+ /day</option>
+    <option value="10000">10,000+ /day</option>
+  </select>
+  <select id="maxcap">
+    <option value="0">Any capital</option>
+    <option value="1000000">≤ 1m to fill limit</option>
+    <option value="10000000">≤ 10m</option>
+    <option value="100000000">≤ 100m</option>
+  </select>
+</div>
+
+<div class="wrap">
+  <table>
+    <thead>
+      <tr>
+        <th data-k="name">Item</th>
+        <th data-k="price">Price</th>
+        <th data-k="chg_pct" aria-sort="descending">Day</th>
+        <th data-k="z" class="hide-sm">Z</th>
+        <th data-k="volume">Volume</th>
+        <th data-k="buy_limit" class="hide-sm">Limit</th>
+        <th data-k="liquidity" class="hide-sm">Liq</th>
+        <th data-k="capital" class="hide-sm">Capital</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <div class="note" id="note" hidden></div>
+</div>
+
+<script type="module">
+const URL_ = "https://hhnkjtbqeaegdxfoyuok.supabase.co";
+const KEY  = "sb_publishable_5KPQJAErYqd41xgrsI81lw_WYjfTKXt";
+
+const el = id => document.getElementById(id);
+const rowsEl = el("rows"), noteEl = el("note");
+
+let data = [], sortKey = "chg_pct", sortDir = -1;
+const filters = { pinned:false, cheap:false, members:false };
+
+const gp = n => {
+  if (n == null) return "—";
+  const a = Math.abs(n);
+  if (a >= 1e9) return (n/1e9).toFixed(2) + "b";
+  if (a >= 1e6) return (n/1e6).toFixed(2) + "m";
+  if (a >= 1e3) return (n/1e3).toFixed(1) + "k";
+  return String(Math.round(n));
+};
+
+async function load() {
+  try {
+    const res = await fetch(
+      `${URL_}/rest/v1/v_screener?select=*&order=volume.desc&limit=2000`,
+      { headers: { apikey: KEY, Authorization: `Bearer ${KEY}` } }
+    );
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    data = await res.json();
+    if (!data.length) {
+      show(`<b>No price data yet.</b> The first pull runs at 07:00 UTC, or trigger it now:
+            <code>curl -X POST https://runenyx.netlify.app/.netlify/functions/ge-ingest-background</code>`);
+      el("stamp").textContent = "no data";
+      return;
+    }
+    const pts = Math.max(...data.map(r => r.points || 0));
+    el("stamp").innerHTML = `${data.length.toLocaleString()} items · ${pts} day${pts===1?"":"s"} of history`;
+    render();
+  } catch (e) {
+    show(`<b>Could not reach the database.</b> ${e.message}`);
+    el("stamp").textContent = "offline";
+  }
+}
+
+function show(html) { noteEl.hidden = false; noteEl.innerHTML = html; rowsEl.innerHTML = ""; }
+
+function render() {
+  const q = el("q").value.trim().toLowerCase();
+  const minVol = +el("minvol").value, maxCap = +el("maxcap").value;
+
+  let rows = data.filter(r =>
+    (!q || r.name.toLowerCase().includes(q)) &&
+    (r.volume || 0) >= minVol &&
+    (!maxCap || (r.capital || 0) <= maxCap) &&
+    (!filters.pinned || r.pinned_at_cap) &&
+    (!filters.cheap || (r.z != null && r.z <= -1)) &&
+    (!filters.members || r.members)
+  );
+
+  rows.sort((a, b) => {
+    const x = a[sortKey], y = b[sortKey];
+    if (x == null) return 1;
+    if (y == null) return -1;
+    return typeof x === "string" ? x.localeCompare(y) * sortDir : (x - y) * sortDir;
+  });
+
+  if (!rows.length) { show("<b>Nothing matches those filters.</b> Loosen the volume or capital limit."); return; }
+  noteEl.hidden = true;
+
+  rowsEl.innerHTML = rows.slice(0, 250).map(r => {
+    const c = r.chg_pct == null ? "" : r.chg_pct > 0 ? "up" : r.chg_pct < 0 ? "down" : "";
+    const sign = r.chg_pct > 0 ? "+" : "";
+    return `<tr>
+      <td><span class="${r.members ? "members" : ""}">${esc(r.name)}</span>${
+        r.pinned_at_cap ? '<span class="pinned">CAP</span>' : ""}</td>
+      <td>${gp(r.price)}</td>
+      <td class="${c}">${r.chg_pct == null ? "—" : sign + r.chg_pct.toFixed(1) + "%"}</td>
+      <td class="hide-sm">${r.z == null ? "—" : r.z.toFixed(2)}</td>
+      <td>${gp(r.volume)}</td>
+      <td class="hide-sm">${r.buy_limit ?? "—"}</td>
+      <td class="hide-sm">${r.liquidity == null ? "—" : r.liquidity.toFixed(1)}</td>
+      <td class="hide-sm">${gp(r.capital)}</td>
+    </tr>`;
+  }).join("");
+}
+
+const esc = s => s.replace(/[&<>"]/g, m => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[m]));
+
+document.querySelectorAll("th").forEach(th => th.addEventListener("click", () => {
+  const k = th.dataset.k;
+  sortDir = sortKey === k ? -sortDir : (k === "name" ? 1 : -1);
+  sortKey = k;
+  document.querySelectorAll("th").forEach(t => t.removeAttribute("aria-sort"));
+  th.setAttribute("aria-sort", sortDir === 1 ? "ascending" : "descending");
+  render();
+}));
+
+for (const [id, key] of [["f-pinned","pinned"],["f-cheap","cheap"],["f-members","members"]]) {
+  el(id).addEventListener("click", e => {
+    filters[key] = !filters[key];
+    e.currentTarget.setAttribute("aria-pressed", String(filters[key]));
+    render();
+  });
+}
+el("q").addEventListener("input", render);
+el("minvol").addEventListener("change", render);
+el("maxcap").addEventListener("change", render);
+
+load();
+</script>
+</body>
+</html>

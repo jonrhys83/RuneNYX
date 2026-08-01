@@ -1,0 +1,7 @@
+{
+  "name": "runenyx",
+  "private": true,
+  "type": "module",
+  "description": "RuneScape 3 Grand Exchange market tracker",
+  "dependencies": {}
+}

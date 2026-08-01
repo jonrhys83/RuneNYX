@@ -23,3 +23,8 @@
 
 [functions."ge-restore-background"]
   background = true
+
+# Wiki reference data barely moves. Sundays, and by hand after a game update.
+[functions."wiki-sync-background"]
+  background = true
+  schedule = "0 9 * * 0"

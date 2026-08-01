@@ -53,7 +53,10 @@ export async function insert(table, rows, { onConflict, ignoreDuplicates } = {})
 export async function putObject(bucket, path, body, contentType) {
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`, {
     method: "POST",
+    // Storage needs the apikey header. With only a Bearer token it tries to
+    // parse the new-style sb_secret_... key as a JWT and rejects it.
     headers: {
+      apikey: SERVICE_KEY,
       Authorization: `Bearer ${SERVICE_KEY}`,
       "Content-Type": contentType,
       "x-upsert": "true",
@@ -69,7 +72,7 @@ export async function putObject(bucket, path, body, contentType) {
 
 export async function getObject(bucket, path) {
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`, {
-    headers: { Authorization: `Bearer ${SERVICE_KEY}` },
+    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
   });
   if (!res.ok) return null;
   return Buffer.from(await res.arrayBuffer());

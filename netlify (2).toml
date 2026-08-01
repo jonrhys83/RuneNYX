@@ -1,0 +1,30 @@
+# Static site lives in site/, functions live in functions/ - deliberately
+# separate. Netlify skips a functions directory that sits inside the publish
+# directory, which silently produces a deploy with zero functions.
+
+[build]
+  publish = "site"
+  functions = "functions"
+
+# --- schedules (UTC) ---
+
+# The GE updates roughly once a day. 07:00 UTC sits after the usual update
+# window, so the dump is fresh when we grab it.
+[functions."ge-pull"]
+  schedule = "0 7 * * *"
+
+# Mondays, half an hour after the pull.
+[functions."ge-rollup"]
+  schedule = "30 7 * * 1"
+
+# Long-running work.
+[functions."ge-ingest-background"]
+  background = true
+
+[functions."ge-restore-background"]
+  background = true
+
+# Wiki reference data barely moves. Sundays, and by hand after a game update.
+[functions."wiki-sync-background"]
+  background = true
+  schedule = "0 9 * * 0"

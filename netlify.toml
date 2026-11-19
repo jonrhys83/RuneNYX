@@ -1,21 +1,37 @@
-# Static site lives in site/, functions live in functions/ - deliberately
-# separate. Netlify skips a functions directory that sits inside the publish
-# directory, which silently produces a deploy with zero functions.
+# Static site in site/, functions in functions/ - deliberately separate.
+# Netlify skips a functions directory nested inside the publish directory and
+# silently ships a deploy with zero functions.
 
 [build]
   publish = "site"
   functions = "functions"
 
 # --- schedules (UTC) ---
+# Jagex updates the GE around 18:00 UTC, so the 07:00 run picks up the previous
+# day's update. Each later job is offset enough that the one before it is done.
 
-# The GE updates roughly once a day. 07:00 UTC sits after the usual update
-# window, so the dump is fresh when we grab it.
+# 1. Fetch the dump, archive it, ingest it.
 [functions."ge-pull"]
   schedule = "0 7 * * *"
 
-# Mondays, half an hour after the pull.
+# 2. Write today's calls from the fresh snapshot.
+[functions."ge-signal-background"]
+  background = true
+  schedule = "19 7 * * *"
+
+# 3. Grade every call whose 7-day horizon has elapsed. Runs on its own
+#    schedule so a broken emit never stops the track record accumulating.
+[functions."ge-score"]
+  schedule = "41 7 * * *"
+
+# 4. Mondays: weekly OHLC bars, prune daily rows past HOT_RETENTION_DAYS.
 [functions."ge-rollup"]
-  schedule = "30 7 * * 1"
+  schedule = "30 8 * * 1"
+
+# 5. Sundays: refresh wiki reference data (shops, drops, locations).
+[functions."wiki-sync-background"]
+  background = true
+  schedule = "0 9 * * 0"
 
 # Long-running work.
 [functions."ge-ingest-background"]
@@ -23,8 +39,3 @@
 
 [functions."ge-restore-background"]
   background = true
-
-# Wiki reference data barely moves. Sundays, and by hand after a game update.
-[functions."wiki-sync-background"]
-  background = true
-  schedule = "0 9 * * 0"

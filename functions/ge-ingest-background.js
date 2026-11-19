@@ -50,8 +50,20 @@ export default async (req) => {
     });
     log(`ingested ${inserted} price rows in ${((Date.now() - started) / 1000).toFixed(1)}s`);
 
+    // --- rebuild the screener snapshot ---
+    // v_screener reads a materialized view. Without this refresh the site keeps
+    // serving yesterday's prices even though the ingest succeeded.
+    let refreshed = false;
+    try {
+      await rpc("refresh_screener", {});
+      refreshed = true;
+      log("screener refreshed");
+    } catch (e) {
+      log(`screener refresh failed: ${e.message}`);
+    }
+
     return new Response(
-      JSON.stringify({ ok: true, snapshotDate, items: items.length, inserted }),
+      JSON.stringify({ ok: true, snapshotDate, items: items.length, inserted, refreshed }),
       { headers: { "content-type": "application/json" } }
     );
   } catch (e) {

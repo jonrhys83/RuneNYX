@@ -24,6 +24,12 @@
 [functions."ge-score"]
   schedule = "41 7 * * *"
 
+# 3b. Real traded prices, hourly. Separate from everything above because it
+#     tracks the actual market rather than Jagex's once-a-day guide price.
+#     One request covers all items, so this stays inside the 30s budget.
+[functions."ge-rt"]
+  schedule = "4 * * * *"
+
 # 4. Mondays: weekly OHLC bars, prune daily rows past HOT_RETENTION_DAYS.
 [functions."ge-rollup"]
   schedule = "30 8 * * 1"

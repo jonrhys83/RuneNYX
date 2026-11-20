@@ -26,8 +26,12 @@
 
 # 3b. Real traded prices, hourly. Separate from everything above because it
 #     tracks the actual market rather than Jagex's once-a-day guide price.
-#     One request covers all items, so this stays inside the 30s budget.
-[functions."ge-rt"]
+#
+#     The schedule sits on a tick wrapper rather than on ge-rt itself, because
+#     Netlify refuses public HTTP access to any function with a schedule - it
+#     answers 403. Keeping ge-rt unscheduled leaves it callable by hand for
+#     verification and gap-filling.
+[functions."ge-rt-tick"]
   schedule = "4 * * * *"
 
 # 4. Mondays: weekly OHLC bars, prune daily rows past HOT_RETENTION_DAYS.

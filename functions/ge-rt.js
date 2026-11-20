@@ -14,11 +14,27 @@
 //   curl .../.netlify/functions/ge-rt
 //   curl ".../.netlify/functions/ge-rt?hot=300"   # also refresh the hot tier
 
-import { requireEnv, rpc, putObject, log, UA } from "./_lib.js";
+import { requireEnv, rpc, putObject, log, UA, SUPABASE_URL, SERVICE_KEY } from "./_lib.js";
 import { gzipSync } from "node:zlib";
 
 const BUCKET = "ge-archive";
 const SRC = "https://prices.runescape.wiki/api/v2/rs/1h";
+
+// This endpoint is public, so it needs to be safe to hit repeatedly. The wiki
+// only publishes one new bucket per hour, so if the current hour is already
+// absorbed there is nothing to fetch. That caps us at one upstream request per
+// hour no matter how often this is called.
+async function alreadyHaveThisHour() {
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/ge_rt_daily?select=last_ts&order=last_ts.desc&limit=1`,
+    { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } });
+  if (!res.ok) return null;                       // fail open; collecting matters more
+  const [row] = await res.json();
+  if (!row?.last_ts) return null;
+  const seen = new Date(row.last_ts).getTime();
+  const thisHour = new Date().setUTCMinutes(0, 0, 0);
+  return seen >= thisHour ? row.last_ts : null;
+}
 
 export default async (req) => {
   const started = Date.now();
@@ -26,6 +42,16 @@ export default async (req) => {
     requireEnv();
 
     const url = new URL(req.url);
+
+    if (url.searchParams.get("force") !== "1") {
+      const have = await alreadyHaveThisHour();
+      if (have) {
+        return new Response(JSON.stringify({
+          ok: true, skipped: "current hour already absorbed", lastTs: have,
+        }), { headers: { "content-type": "application/json" } });
+      }
+    }
+
     // The wiki pre-blocks default library user agents, so identify properly.
     const res = await fetch(SRC, { headers: { "User-Agent": UA } });
     if (!res.ok) {
